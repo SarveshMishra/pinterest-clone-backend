@@ -5,7 +5,6 @@ const multer = require("multer");
 const upload = multer({ dest: "uploads/" });
 
 user.use(express.json());
-
 user.get("/", userController.fetchAllUsers);
 user.post("/", userController.createUser);
 user.get("/:id", userController.fetchUserById);
