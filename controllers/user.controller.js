@@ -63,10 +63,11 @@ const uploadAvatar = async (req, res) => {
 	await unlinkFile(req.file.path);
 
 	let user = await User.findById(id);
-	user.avatar = result.key;
+	const img_url = `${process.env.BASE_URL}/users/${user._id}/avatar/${result.key}`;
+	user.avatar = img_url;
 	user.save();
 
-	res.send({ imagePath: `/avatar/${result.key}` });
+	res.send({ imagePath: `${img_url}` });
 };
 
 const downloadAvatar = async (req, res) => {
@@ -93,7 +94,7 @@ const updateUser = async (req, res) => {
 	const { id } = req.query;
 	const { name, email, password } = req.body;
 	const user = await User.findById(id);
-	console.log(user)
+	console.log(user);
 	if (!user) {
 		res.status(404).send("User not found");
 	} else {

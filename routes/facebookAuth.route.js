@@ -62,7 +62,7 @@ auth.get(
 	passport.authenticate("facebook", { failureRedirect: "/login" }),
 	function (req, res) {
 		// Successful authentication, redirect home.
-		res.send(true);
+		res.redirect(`${process.env.FRONTEND_URL}/`);
 	}
 );
 module.exports = auth;
