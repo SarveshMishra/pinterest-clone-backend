@@ -2,33 +2,17 @@ require("dotenv").config();
 const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
-
-const FacebookModel = require("../models/facebook.model");
+const FacebookModel = require("../models/user.model");
 const FacebookStrategy = require("passport-facebook").Strategy;
 
 const auth = express();
-auth.use(
-	session({
-		secret: "Our little secret.",
-		resave: false,
-		saveUninitialized: false,
-	})
-);
-auth.use(passport.initialize());
-auth.use(passport.session());
-
-passport.use(FacebookModel.createStrategy());
-
 passport.serializeUser(function (user, done) {
-	done(null, user.id);
+	done(null, user);
 });
 
-passport.deserializeUser(function (id, done) {
-	FacebookModel.findById(id, function (err, user) {
-		done(err, user);
-	});
+passport.deserializeUser(function (user, done) {
+	done(null, user);
 });
-
 passport.use(
 	new FacebookStrategy(
 		{

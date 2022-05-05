@@ -3,8 +3,16 @@ const express = require("express");
 const google = express.Router();
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth2").Strategy;
-const googleUser = require("../models/google.model");
+const googleUser = require("../models/user.model");
+
 // Google OAuth Strategy
+passport.serializeUser(function (user, done) {
+	done(null, user);
+});
+
+passport.deserializeUser(function (user, done) {
+	done(null, user);
+});
 passport.use(
 	new GoogleStrategy(
 		{
@@ -13,8 +21,6 @@ passport.use(
 			callbackURL: `${process.env.BASE_URL}/auth/google/callback`,
 		},
 		function (accessToken, refreshToken, profile, done) {
-			// console.log(profile);
-
 			googleUser
 				.findOne({ googleId: profile.id })
 				.then((currentUser) => {

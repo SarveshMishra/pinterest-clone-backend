@@ -1,6 +1,4 @@
 const User = require("../models/user.model");
-const googleUser = require("../models/google.model");
-const facebookUser = require("../models/facebook.model");
 const uploadS3 = require("../database/s3");
 const fs = require("fs");
 const util = require("util");
@@ -24,24 +22,29 @@ const createUser = (req, res) => {
 		let userDetail = req.body;
 
 		const findUser = User.findOne({ email: userDetail.email });
-		const findGoogleUser = googleUser.findOne({ email: userDetail.email });
-		const findFacebookUser = facebookUser.findOne({ email: userDetail.email });
-		if (findUser) {
-			res.status(400).send("User already exists");
-		} else if (findGoogleUser) {
-			res.status(400).send("User already exists, Try login with Google");
-		} else if (findFacebookUser) {
-			res.status(400).send("User already exists, Try login with Facebook");
-		} else {
-			let user = new User(userDetail);
-			user.save((err, user) => {
-				if (err) {
-					res.status(500).send(err);
+
+		findUser.then((user) => {
+			console.log(user);
+			if (user.facebookId) {
+				res.status(400).send("User already exists, please login with facebook");
+			}
+			if (user.googleId) {
+				res.status(400).send("User already exists, please login with google");
+			} else {
+				if (user) {
+					res.status(500).send("User already exists");
 				} else {
-					res.status(200).send(user);
+					let user = new User(userDetail);
+					user.save((err, user) => {
+						if (err) {
+							res.status(500).send(err);
+						} else {
+							res.status(200).send(user);
+						}
+					});
 				}
-			});
-		}
+			}
+		});
 	} catch (error) {
 		res.status(500).send(error);
 	}
@@ -82,15 +85,14 @@ const downloadAvatar = async (req, res) => {
 const login = async (req, res) => {
 	const { email, password } = req.body;
 
-	const findGoogleUser = googleUser.findOne({ email: userDetail.email });
-	const findFacebookUser = facebookUser.findOne({ email: userDetail.email });
-	if (findGoogleUser) {
-		res.status(400).send("Try login with Google");
-	} else if (findFacebookUser) {
-		res.status(400).send("Try login with Facebook");
+	const user = await User.findOne({ email });
+	console.log(user);
+	if (user.facebookId) {
+		res.status(400).send("User already exists, please login with facebook");
+	}
+	if (user.googleId) {
+		res.status(400).send("User already exists, please login with google");
 	} else {
-		const user = await User.findOne({ email });
-
 		if (!user) {
 			res.status(404).send("User not exists");
 		} else {
