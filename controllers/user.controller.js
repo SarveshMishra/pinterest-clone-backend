@@ -19,20 +19,41 @@ const fetchAllUsers = (req, res) => {
 };
 const createUser = (req, res) => {
 	try {
+		console.log(req.body);
 		let userDetail = req.body;
-		let user = new User(userDetail);
-		user.save((err, user) => {
-			if (err) {
-				res.status(500).send(err);
+
+		const findUser = User.findOne({ email: userDetail.email });
+		findUser.then((user) => {
+			if (user) {
+				res.status(400).send("User already exists");
 			} else {
-				res.status(200).send(user);
+				let user = new User(userDetail);
+
+				user.save((err, user) => {
+					if (err) {
+						res.status(500).send(err);
+					} else {
+						res.status(200).send(user);
+					}
+				});
 			}
 		});
 	} catch (error) {
 		res.status(500).send(error);
 	}
 };
-const fetchUserById = (req, res) => {};
+
+const fetchUserById = (req, res) => {
+	let userId = req.query.id;
+	console.log(userId);
+	User.findById(userId, (err, user) => {
+		if (err) {
+			res.status(500).send(err);
+		} else {
+			res.status(200).send(user);
+		}
+	});
+};
 
 const uploadAvatar = async (req, res) => {
 	const { id } = req.params;
@@ -53,6 +74,42 @@ const downloadAvatar = async (req, res) => {
 	// To convert binary data to media type
 	readStream.pipe(res);
 };
+const login = async (req, res) => {
+	const { email, password } = req.body;
+	console.log(email, password);
+	const user = await User.findOne({ email });
+	console.log(user.password);
+	if (!user) {
+		res.status(404).send("User not found");
+	} else {
+		if (user.password == password) {
+			res.status(200).send(user);
+		} else {
+			res.status(401).send("Password is incorrect");
+		}
+	}
+};
+const updateUser = async (req, res) => {
+	const { id } = req.query;
+	const { name, email, password } = req.body;
+	const user = await User.findById(id);
+	console.log(user)
+	if (!user) {
+		res.status(404).send("User not found");
+	} else {
+		if (name) user.name = name;
+		if (email) user.email = email;
+		if (password) user.password = password;
+
+		user.save((err, user) => {
+			if (err) {
+				res.status(500).send(err);
+			} else {
+				res.status(200).send(user);
+			}
+		});
+	}
+};
 
 module.exports = {
 	fetchAllUsers,
@@ -60,4 +117,6 @@ module.exports = {
 	fetchUserById,
 	uploadAvatar,
 	downloadAvatar,
+	login,
+	updateUser,
 };
