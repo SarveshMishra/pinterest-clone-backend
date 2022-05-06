@@ -8,9 +8,10 @@ const tokenVerifier = (req, res, next) => {
 	jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
 		if (err) {
 			res.status(401).json({ message: "Token invalid" });
+		} else {
+			req.user = payload;
+			next();
 		}
-		req.user = payload;
-		next();
 	});
 };
 module.exports = tokenVerifier;

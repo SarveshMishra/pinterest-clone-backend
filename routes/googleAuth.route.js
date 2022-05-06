@@ -5,8 +5,10 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth2").Strategy;
 const googleUser = require("../models/user.model");
 const cors = require("cors");
-
+const tokenGenerator = require("../lib/JWTToken");
+const activeToken = require("../models/activeToken.model");
 google.use(cors());
+let token = null;
 // Google OAuth Strategy
 passport.serializeUser(function (user, done) {
 	done(null, user);
@@ -25,10 +27,17 @@ passport.use(
 		function (accessToken, refreshToken, profile, done) {
 			googleUser
 				.findOne({ googleId: profile.id })
-				.then((currentUser) => {
+				.then(async (currentUser) => {
 					if (currentUser) {
 						done(null, currentUser);
 					} else {
+						token = await tokenGenerator.generateToken({
+							googleId: profile.id,
+							name: profile.displayName,
+							email: profile.email,
+							avatar: profile.picture,
+						});
+
 						new googleUser({
 							googleId: profile.id,
 							name: profile.displayName,
@@ -37,6 +46,11 @@ passport.use(
 						})
 							.save()
 							.then((newUser) => {
+								const newToken = new activeToken({
+									token: token,
+									userId: newUser._id,
+								});
+								newToken.save();
 								done(null, newUser);
 							})
 							.catch((err) => {
@@ -60,7 +74,11 @@ google.get(
 	"/callback",
 	passport.authenticate("google", { failureRedirect: "/login" }),
 	(req, res) => {
-		res.redirect("/");
+		console.log(token);
+		res.json({
+			token: token,
+			success: true,
+		});
 	}
 );
 

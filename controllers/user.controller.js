@@ -5,7 +5,8 @@ const fs = require("fs");
 const util = require("util");
 const unlinkFile = util.promisify(fs.unlink);
 const tokenGenerator = require("../lib/JWTToken");
-
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 const fetchAllUsers = (req, res) => {
 	try {
 		User.find({}, (err, users) => {
@@ -20,13 +21,11 @@ const fetchAllUsers = (req, res) => {
 	}
 };
 const createUser = async (req, res) => {
-	console.log(req.body);
 	let userDetail = req.body;
 
 	const findUser = User.findOne({ email: userDetail.email });
 
 	findUser.then((user) => {
-		console.log(user);
 		if (user != null) {
 			if (user.facebookId != "") {
 				res
@@ -42,32 +41,39 @@ const createUser = async (req, res) => {
 					.json({ message: "User already exists, Try login with email" });
 			}
 		} else {
-			let user = new User(userDetail);
-			user.save(async (err, user) => {
+			bcrypt.hash(userDetail.password, saltRounds, function (err, hash) {
 				if (err) {
-					res.status(500).json({
-						message: err,
-					});
+					res.status(500).send(err);
 				} else {
-					const token = await tokenGenerator.generateToken({
-						id: user._id,
-						name: user.name,
-						email: user.email,
-						avatar: user.avatar,
-					});
-					const newToken = new activeToken({
-						token: token,
-						userId: user._id,
-					});
-					newToken.save((err, token) => {
+					userDetail.password = hash;
+					let user = new User(userDetail);
+					user.save(async (err, user) => {
 						if (err) {
 							res.status(500).json({
 								message: err,
 							});
 						} else {
-							res.status(200).json({
-								success: true,
-								token,
+							const token = await tokenGenerator.generateToken({
+								id: user._id,
+								name: user.name,
+								email: user.email,
+								avatar: user.avatar,
+							});
+							const newToken = new activeToken({
+								token: token,
+								userId: user._id,
+							});
+							newToken.save((err, token) => {
+								if (err) {
+									res.status(500).json({
+										message: err,
+									});
+								} else {
+									res.status(200).json({
+										success: true,
+										token,
+									});
+								}
 							});
 						}
 					});
@@ -80,9 +86,6 @@ const createUser = async (req, res) => {
 const fetchUserById = (req, res) => {
 	let userId = req.user.id;
 	console.log(req.user);
-
-	
-
 
 	User.findById(userId, (err, user) => {
 		if (err) {
@@ -126,13 +129,12 @@ const login = async (req, res) => {
 	const { email, password } = req.body;
 
 	const user = await User.findOne({ email });
-	console.log(user);
-	if (user.facebookId) {
+	// console.log(user);
+	if (user.facebookId != "") {
 		res
 			.status(400)
 			.json({ message: "User already exists, please login with facebook" });
-	}
-	if (user.googleId) {
+	} else if (user.googleId != "") {
 		res
 			.status(400)
 			.json({ message: "User already exists, please login with google" });
@@ -140,35 +142,47 @@ const login = async (req, res) => {
 		if (!user) {
 			res.status(404).json({ message: "User does not exist" });
 		} else {
-			if (user.password == password) {
-				const token = await tokenGenerator.generateToken({
-					id: user._id,
-					name: user.name,
-					email: user.email,
-					avatar: user.avatar,
-				});
-				const newToken = new activeToken({
-					token: token,
-					userId: user._id,
-				});
-				newToken.save((err, token) => {
-					if (err) {
-						res.status(500).json({
-							message: err,
+			bcrypt.compare(password, user.password, async function (err, result) {
+				if (err) {
+					res.status(500).json({
+						message: err,
+					});
+				} else {
+					if (result) {
+						const token = await tokenGenerator.generateToken({
+							id: user._id,
+							name: user.name,
+							email: user.email,
+							avatar: user.avatar,
+						});
+
+						const newToken = new activeToken({
+							token: token,
+							userId: user._id,
+						});
+						newToken.save((err, token) => {
+							if (err) {
+								res.status(500).json({
+									message: err,
+								});
+							} else {
+								res.status(200).json({
+									success: true,
+									token,
+								});
+							}
 						});
 					} else {
-						res.status(200).json({
-							success: true,
-							token,
+						res.status(400).json({
+							message: "Password is incorrect",
 						});
 					}
-				});
-			} else {
-				res.status(401).json({ message: "Wrong Credential" });
-			}
+				}
+			});
 		}
 	}
 };
+
 const updateUser = async (req, res) => {
 	const { id } = req.query;
 	const { name, email, password } = req.body;
