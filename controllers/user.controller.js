@@ -130,56 +130,47 @@ const login = async (req, res) => {
 
 	const user = await User.findOne({ email });
 	// console.log(user);
-	if (user.facebookId != "") {
-		res
-			.status(400)
-			.json({ message: "User already exists, please login with facebook" });
-	} else if (user.googleId != "") {
-		res
-			.status(400)
-			.json({ message: "User already exists, please login with google" });
+
+	if (!user) {
+		res.status(404).json({ message: "User does not exist" });
 	} else {
-		if (!user) {
-			res.status(404).json({ message: "User does not exist" });
-		} else {
-			bcrypt.compare(password, user.password, async function (err, result) {
-				if (err) {
-					res.status(500).json({
-						message: err,
+		bcrypt.compare(password, user.password, async function (err, result) {
+			if (err) {
+				res.status(500).json({
+					message: err,
+				});
+			} else {
+				if (result) {
+					const token = await tokenGenerator.generateToken({
+						id: user._id,
+						name: user.name,
+						email: user.email,
+						avatar: user.avatar,
+					});
+
+					const newToken = new activeToken({
+						token: token,
+						userId: user._id,
+					});
+					newToken.save((err, token) => {
+						if (err) {
+							res.status(500).json({
+								message: err,
+							});
+						} else {
+							res.status(200).json({
+								success: true,
+								token,
+							});
+						}
 					});
 				} else {
-					if (result) {
-						const token = await tokenGenerator.generateToken({
-							id: user._id,
-							name: user.name,
-							email: user.email,
-							avatar: user.avatar,
-						});
-
-						const newToken = new activeToken({
-							token: token,
-							userId: user._id,
-						});
-						newToken.save((err, token) => {
-							if (err) {
-								res.status(500).json({
-									message: err,
-								});
-							} else {
-								res.status(200).json({
-									success: true,
-									token,
-								});
-							}
-						});
-					} else {
-						res.status(400).json({
-							message: "Password is incorrect",
-						});
-					}
+					res.status(400).json({
+						message: "Password is incorrect",
+					});
 				}
-			});
-		}
+			}
+		});
 	}
 };
 
