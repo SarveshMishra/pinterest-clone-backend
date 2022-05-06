@@ -1,11 +1,12 @@
 require("dotenv").config();
 const express = require("express");
-const session = require("express-session");
 const passport = require("passport");
 const FacebookModel = require("../models/user.model");
 const FacebookStrategy = require("passport-facebook").Strategy;
+const cors = require("cors");
+const auth = express.Router();
 
-const auth = express();
+auth.use(cors());
 passport.serializeUser(function (user, done) {
 	done(null, user);
 });
@@ -21,20 +22,32 @@ passport.use(
 			callbackURL: `${process.env.BASE_URL}/auth/facebook/callback`,
 			profileFields: ["id", "displayName", "photos", "email"],
 		},
-		function (accessToken, refreshToken, profile, cb) {
-			console.log(profile.photos[0].value);
+
+		function (accessToken, refreshToken, profile, done) {
 			let avatar = profile.photos[0].value;
-			FacebookModel.findOrCreate(
-				{
-					facebookId: profile.id,
-					name: profile.displayName,
-					avatar: avatar,
-					email: null,
-				},
-				function (err, user) {
-					return cb(err, user);
-				}
-			);
+			FacebookModel.findOne({ facebookId: profile.id })
+				.then((currentUser) => {
+					if (currentUser) {
+						done(null, currentUser);
+					} else {
+						new FacebookModel({
+							facebookId: profile.id,
+							name: profile.displayName,
+							email: "user@facebook.com",
+							avatar: avatar,
+						})
+							.save()
+							.then((newUser) => {
+								done(null, newUser);
+							})
+							.catch((err) => {
+								console.log(err);
+							});
+					}
+				})
+				.catch((err) => {
+					console.log(err);
+				});
 		}
 	)
 );

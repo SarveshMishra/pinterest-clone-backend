@@ -4,7 +4,9 @@ const google = express.Router();
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth2").Strategy;
 const googleUser = require("../models/user.model");
+const cors = require("cors");
 
+google.use(cors());
 // Google OAuth Strategy
 passport.serializeUser(function (user, done) {
 	done(null, user);

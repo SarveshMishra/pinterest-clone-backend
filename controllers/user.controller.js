@@ -1,8 +1,11 @@
 const User = require("../models/user.model");
+const activeToken = require("../models/activeToken.model");
 const uploadS3 = require("../database/s3");
 const fs = require("fs");
 const util = require("util");
 const unlinkFile = util.promisify(fs.unlink);
+const tokenGenerator = require("../lib/JWTToken");
+
 const fetchAllUsers = (req, res) => {
 	try {
 		User.find({}, (err, users) => {
@@ -16,48 +19,85 @@ const fetchAllUsers = (req, res) => {
 		res.status(500).send(error);
 	}
 };
-const createUser = (req, res) => {
-	try {
-		console.log(req.body);
-		let userDetail = req.body;
+const createUser = async (req, res) => {
+	console.log(req.body);
+	let userDetail = req.body;
 
-		const findUser = User.findOne({ email: userDetail.email });
+	const findUser = User.findOne({ email: userDetail.email });
 
-		findUser.then((user) => {
-			console.log(user);
-			if (user.facebookId) {
-				res.status(400).send("User already exists, please login with facebook");
+	findUser.then((user) => {
+		console.log(user);
+		if (user != null) {
+			if (user.facebookId != "") {
+				res
+					.status(400)
+					.json({ message: "User already exists, please login with facebook" });
+			} else if (user.googleId != "") {
+				res
+					.status(400)
+					.json({ message: "User already exists, please login with google" });
+			} else if (user) {
+				res
+					.status(500)
+					.json({ message: "User already exists, Try login with email" });
 			}
-			if (user.googleId) {
-				res.status(400).send("User already exists, please login with google");
-			} else {
-				if (user) {
-					res.status(500).send("User already exists");
+		} else {
+			let user = new User(userDetail);
+			user.save(async (err, user) => {
+				if (err) {
+					res.status(500).json({
+						message: err,
+					});
 				} else {
-					let user = new User(userDetail);
-					user.save((err, user) => {
+					const token = await tokenGenerator.generateToken({
+						id: user._id,
+						name: user.name,
+						email: user.email,
+						avatar: user.avatar,
+					});
+					const newToken = new activeToken({
+						token: token,
+						userId: user._id,
+					});
+					newToken.save((err, token) => {
 						if (err) {
-							res.status(500).send(err);
+							res.status(500).json({
+								message: err,
+							});
 						} else {
-							res.status(200).send(user);
+							res.status(200).json({
+								success: true,
+								token,
+							});
 						}
 					});
 				}
-			}
-		});
-	} catch (error) {
-		res.status(500).send(error);
-	}
+			});
+		}
+	});
 };
 
 const fetchUserById = (req, res) => {
-	let userId = req.query.id;
-	console.log(userId);
+	let userId = req.user.id;
+	console.log(req.user);
+
+	
+
+
 	User.findById(userId, (err, user) => {
 		if (err) {
-			res.status(500).send(err);
+			res.status(500).json({
+				message: err,
+			});
 		} else {
-			res.status(200).send(user);
+			res.status(200).json({
+				success: true,
+				user: {
+					name: user.name,
+					email: user.email,
+					avatar: user.avatar,
+				},
+			});
 		}
 	});
 };
@@ -88,18 +128,43 @@ const login = async (req, res) => {
 	const user = await User.findOne({ email });
 	console.log(user);
 	if (user.facebookId) {
-		res.status(400).send("User already exists, please login with facebook");
+		res
+			.status(400)
+			.json({ message: "User already exists, please login with facebook" });
 	}
 	if (user.googleId) {
-		res.status(400).send("User already exists, please login with google");
+		res
+			.status(400)
+			.json({ message: "User already exists, please login with google" });
 	} else {
 		if (!user) {
-			res.status(404).send("User not exists");
+			res.status(404).json({ message: "User does not exist" });
 		} else {
 			if (user.password == password) {
-				res.status(200).send(user);
+				const token = await tokenGenerator.generateToken({
+					id: user._id,
+					name: user.name,
+					email: user.email,
+					avatar: user.avatar,
+				});
+				const newToken = new activeToken({
+					token: token,
+					userId: user._id,
+				});
+				newToken.save((err, token) => {
+					if (err) {
+						res.status(500).json({
+							message: err,
+						});
+					} else {
+						res.status(200).json({
+							success: true,
+							token,
+						});
+					}
+				});
 			} else {
-				res.status(401).send("Password is incorrect");
+				res.status(401).json({ message: "Wrong Credential" });
 			}
 		}
 	}
@@ -118,14 +183,34 @@ const updateUser = async (req, res) => {
 
 		user.save((err, user) => {
 			if (err) {
-				res.status(500).send(err);
+				res.status(500).json({
+					message: err,
+				});
 			} else {
-				res.status(200).send(user);
+				res.status(200).json({
+					success: true,
+					user,
+				});
 			}
 		});
 	}
 };
 
+const signOut = (req, res) => {
+	let id = req.user.id;
+	activeToken.findOneAndDelete({ userId: id }, (err, user) => {
+		if (err) {
+			res.status(500).json({
+				message: err,
+			});
+		} else {
+			res.status(200).json({
+				success: true,
+				message: "Logout successfully",
+			});
+		}
+	});
+};
 module.exports = {
 	fetchAllUsers,
 	createUser,
@@ -134,4 +219,5 @@ module.exports = {
 	downloadAvatar,
 	login,
 	updateUser,
+	signOut,
 };
