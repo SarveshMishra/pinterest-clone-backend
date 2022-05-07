@@ -15,30 +15,8 @@ Pinterest is an image sharing and social media service designed to enable saving
 
 - Express
 - MongoDB
-- AWS
+- AWS-S3
 - Unsplash API
 - Heroku
 
-# Team Members
 
-- [Mangesh Pralhad pandit ](https://github.com/alicehack2020)
-- [Sarvesh Mishra](https://github.com/SarveshMishra/)
-
-## API Documentation
-
-### USER
-
-- [POST] /users ---> Create new user
-
-  ```
-  {
-  	"name": "John Doe",
-  	"email": "abc@xyz.com",
-  	"password": "12345678"
-    "avatar": "https://avatars2.githubusercontent.com/u/1234?v=4",
-    "role": "user"
-  }
-  ```
-
-- [GET] /users/ ---> Get all users
-- [GET] /users/:id ---> Get user by id
